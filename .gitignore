@@ -4,6 +4,7 @@ config.env
 # База данных
 database/*.db
 database/*.sqlite
+!database/schema*.sql
 
 # Логи
 logs/*.log
