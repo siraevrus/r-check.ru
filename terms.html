@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пользовательское соглашение</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="min-h-screen bg-gray-100">
+    <nav class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-semibold text-gray-900">Система учета</h1>
+                </div>
+                <div class="flex items-center">
+                    <a href="/index.php" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-home mr-2"></i>
+                        На главную
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-6 py-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-6">Пользовательское соглашение</h1>
+                
+                <div class="prose prose-blue max-w-none">
+                    <p class="text-gray-600 mb-4">
+                        Дата последнего обновления: <?= date('d.m.Y') ?>
+                    </p>
+
+                    <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-3">1. Общие положения</h2>
+                    <p class="text-gray-700 mb-4">
+                        Настоящее Пользовательское соглашение (далее — «Соглашение») регулирует отношения между 
+                        администрацией системы учета  (далее — «Администрация») и пользователем данной системы 
+                        (далее — «Пользователь»).
+                    </p>
+                    <p class="text-gray-700 mb-4">
+                        Регистрируясь и используя систему, Пользователь подтверждает свое согласие с условиями 
+                        настоящего Соглашения.
+                    </p>
+
+                    <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-3">2. Предмет соглашения</h2>
+                    <p class="text-gray-700 mb-4">
+                        Администрация предоставляет Пользователю доступ к системе учета продаж и промокодов 
+                        (далее — «Система») на условиях, предусмотренных настоящим Соглашением.
+                    </p>
+
+                    <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-3">3. Регистрация и доступ</h2>
+                    <p class="text-gray-700 mb-4">
+                        3.1. Для использования Системы Пользователь должен пройти процедуру регистрации.
+                    </p>
+                    <p class="text-gray-700 mb-4">
+                        3.2. При регистрации Пользователь обязуется предоставить достоверную и актуальную информацию.
+                    </p>
+                    <p class="text-gray-700 mb-4">
+                        3.3. Доступ к Системе предоставляется на основании промокода, выданного Администрацией.
+                    </p>
+                    <p class="text-gray-700 mb-4">
+                        3.4. Пользователь несет ответственность за сохранность своих учетных данных и за все 
+                        действия, совершенные под его учетной записью.
+                    </p>
+
+                    <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-3">4. Права и обязанности Пользователя</h2>
+                    <p class="text-gray-700 mb-4">
+                        4.1. Пользователь имеет право:
+                    </p>
+                    <ul class="list-disc list-inside text-gray-700 mb-4 ml-4">
+                        <li>Использовать Систему в соответствии с ее функциональным назначением</li>
+                        <li>Получать техническую поддержку</li>
+                        <li>Просматривать свою статистику продаж</li>
+                    </ul>
+                    <p class="text-gray-700 mb-4">
+                        4.2. Пользователь обязуется:
+                    </p>
+                    <ul class="list-disc list-inside text-gray-700 mb-4 ml-4">
+                        <li>Не передавать свои учетные данные третьим лицам</li>
+                        <li>Не использовать Систему в незаконных целях</li>
+                        <li>Своевременно обновлять свои контактные данные</li>
+                        <li>Немедленно уведомить Администрацию о любом несанкционированном доступе к учетной записи</li>
+                    </ul>
+
+                    <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-3">5. Права и обязанности Администрации</h2>
+                    <p class="text-gray-700 mb-4">
+                        5.1. Администрация имеет право:
+                    </p>
+                    <ul class="list-disc list-inside text-gray-700 mb-4 ml-4">
+                        <li>Изменять условия настоящего Соглашения</li>
+                        <li>Приостанавливать или прекращать доступ Пользователя при нарушении условий Соглашения</li>
+                        <li>Проводить технические работы и обновления Системы</li>
+                    </ul>
+                    <p class="text-gray-700 mb-4">
+                        5.2. Администрация обязуется:
+                    </p>
+                    <ul class="list-disc list-inside text-gray-700 mb-4 ml-4">
+                        <li>Обеспечивать работоспособность Системы</li>
+                        <li>Защищать персональные данные Пользователя в соответствии с законодательством</li>
+                        <li>Предоставлять техническую поддержку</li>
+                    </ul>
+
+                    <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-3">6. Ответственность</h2>
+                    <p class="text-gray-700 mb-4">
+                        6.1. Пользователь несет полную ответственность за достоверность предоставленных данных.
+                    </p>
+                    <p class="text-gray-700 mb-4">
+                        6.2. Администрация не несет ответственности за временные сбои в работе Системы, 
+                        вызванные техническими причинами.
+                    </p>
+
+                    <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-3">7. Конфиденциальность</h2>
+                    <p class="text-gray-700 mb-4">
+                        Вопросы обработки и защиты персональных данных регулируются 
+                        <a href="/privacy.html" class="text-blue-600 hover:text-blue-800">Политикой конфиденциальности</a>.
+                    </p>
+
+                    <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-3">8. Изменение условий</h2>
+                    <p class="text-gray-700 mb-4">
+                        Администрация вправе в любое время изменять условия настоящего Соглашения. 
+                        Новая редакция вступает в силу с момента ее размещения на сайте.
+                    </p>
+
+                    <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-3">9. Заключительные положения</h2>
+                    <p class="text-gray-700 mb-4">
+                        9.1. Настоящее Соглашение составлено на русском языке.
+                    </p>
+                    <p class="text-gray-700 mb-4">
+                        9.2. Все споры решаются путем переговоров. В случае невозможности достижения согласия 
+                        споры разрешаются в судебном порядке в соответствии с законодательством Российской Федерации.
+                    </p>
+                </div>
+
+                <div class="mt-8 pt-6 border-t border-gray-200">
+                    <a href="/user_register.php" class="inline-flex items-center text-blue-600 hover:text-blue-800">
+                        <i class="fas fa-arrow-left mr-2"></i>
+                        Вернуться к регистрации
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
+
+

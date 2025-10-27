@@ -1,0 +1,47 @@
+# Конфигурация
+config.env
+
+# База данных
+database/*.db
+database/*.sqlite
+
+# Логи
+logs/*.log
+
+# Загрузки
+uploads/*
+!uploads/.gitkeep
+
+# Резервные копии
+backups/*
+!backups/.gitkeep
+
+# Временные файлы
+tmp/
+temp/
+
+# Composer
+composer.phar
+vendor/
+
+# Тестовые и диагностические файлы
+test_*.php
+debug_*.php
+create_test_*.php
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Файлы сессий
+sessions/*
+
+# Node modules (если используется)
+node_modules/

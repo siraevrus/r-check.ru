@@ -1,0 +1,55 @@
+RewriteEngine On
+
+# Скрытие расширения .php
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^([^\.]+)$ $1.php [NC,L]
+
+# Перенаправление с .php на URL без расширения
+RewriteCond %{THE_REQUEST} /([^.]+)\.php [NC]
+RewriteRule ^ /%1? [NC,L,R=301]
+
+# Перенаправление на HTTPS (опционально)
+# RewriteCond %{HTTPS} off
+# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Скрыть служебные файлы
+<FilesMatch "\.(md|json|lock|env|sql|log)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Защита папки vendor
+<Directory vendor>
+    Order allow,deny
+    Deny from all
+</Directory>
+
+# Защита папки database
+<Directory database>
+    Order allow,deny
+    Deny from all
+</Directory>
+
+# Защита папки logs
+<Directory logs>
+    Order allow,deny
+    Deny from all
+</Directory>
+
+# Защита папки backups
+<Directory backups>
+    Order allow,deny
+    Deny from all
+</Directory>
+
+# Защита конфигурационных файлов
+<FilesMatch "^(config\.env|\.env)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Основные правила для приложения
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
