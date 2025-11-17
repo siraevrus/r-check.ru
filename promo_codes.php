@@ -72,15 +72,24 @@ if ($_POST && isset($_POST['action'])) {
                     if (!$user) {
                         NotificationSystem::error("Пользователь не найден");
                     } else {
-                        // Удаляем связь между промокодом и пользователем
-                        $stmt = $pdo->prepare("UPDATE users SET promo_code_id = NULL WHERE id = ?");
-                        $stmt->execute([$user['id']]);
+                        $pdo->beginTransaction();
+                        
+                        try {
+                            // Удаляем пользователя из базы данных
+                            $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+                            $stmt->execute([$user['id']]);
 
-                        // Обновляем статус промокода на "unregistered"
-                        $stmt = $pdo->prepare("UPDATE promo_codes SET status = 'unregistered', updated_at = datetime('now') WHERE id = ?");
-                        $stmt->execute([$promoId]);
+                            // Обновляем статус промокода на "unregistered"
+                            $stmt = $pdo->prepare("UPDATE promo_codes SET status = 'unregistered', updated_at = datetime('now') WHERE id = ?");
+                            $stmt->execute([$promoId]);
 
-                        NotificationSystem::success("Пользователь '{$user['full_name']}' успешно отвязан от промокода '{$promo['code']}'");
+                            $pdo->commit();
+                            
+                            NotificationSystem::success("Пользователь '{$user['full_name']}' успешно отвязан от промокода '{$promo['code']}' и удален из системы");
+                        } catch (Exception $e) {
+                            $pdo->rollBack();
+                            throw $e;
+                        }
                     }
                 }
             } catch (Exception $e) {
@@ -342,10 +351,10 @@ $promoCodes = $stmt->fetchAll();
                                                class="text-blue-600 hover:text-blue-800 hover:underline">
                                                 <?= htmlspecialchars($promo['full_name']) ?>
                                             </a>
-                                            <form method="POST" class="inline" onsubmit="return confirm('Вы уверены, что хотите отвязать пользователя от промокода?')">
+                                            <form method="POST" class="inline" onsubmit="return confirm('Вы уверены, что хотите отвязать пользователя от промокода и удалить его из системы? Это действие нельзя отменить.')">
                                                 <input type="hidden" name="action" value="delete_user_from_promo">
                                                 <input type="hidden" name="promo_id" value="<?= $promo['id'] ?>">
-                                                <button type="submit" class="text-red-600 hover:text-red-800" title="Отвязать пользователя">
+                                                <button type="submit" class="text-red-600 hover:text-red-800" title="Отвязать и удалить пользователя">
                                                     <i class="fas fa-user-times"></i>
                                                 </button>
                                             </form>

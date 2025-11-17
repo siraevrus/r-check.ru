@@ -1,0 +1,24 @@
+=== СПИСОК ФАЙЛОВ ДЛЯ КОПИРОВАНИЯ НА СЕРВЕР ===
+
+PHP ФАЙЛЫ (4 файла):
+1. export_excel.php
+2. file_upload.php
+3. preview_upload.php
+4. users_report.php
+
+БАЗА ДАННЫХ (1 файл):
+5. database/reprocrm.db
+
+СХЕМЫ БД (опционально, для справки):
+6. database/schema.sql
+7. database/schema.sqlite.sql
+
+=== КРАТКАЯ ИНСТРУКЦИЯ ===
+
+1. Сделайте резервную копию БД на сервере
+2. Скопируйте 4 PHP файла в корень проекта
+3. Скопируйте database/reprocrm.db в папку database/
+4. Проверьте права доступа (chmod 644 для БД, 755 для PHP)
+5. Проверьте работу системы
+
+Подробности в файле FILES_TO_COPY.md

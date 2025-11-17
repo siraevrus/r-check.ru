@@ -36,6 +36,58 @@ try {
         exit;
     }
 
+    // Обработка удаления пользователя
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_user') {
+        $userIdToDelete = (int)($_POST['user_id'] ?? 0);
+        
+        if ($userIdToDelete <= 0 || $userIdToDelete !== $doctorId) {
+            $message = 'Неверный ID пользователя';
+            $messageType = 'error';
+        } else {
+            try {
+                // Получаем информацию о пользователе перед удалением
+                $stmt = $pdo->prepare("SELECT id, full_name, promo_code_id FROM users WHERE id = ?");
+                $stmt->execute([$userIdToDelete]);
+                $userToDelete = $stmt->fetch();
+                
+                if (!$userToDelete) {
+                    $message = 'Пользователь не найден';
+                    $messageType = 'error';
+                } else {
+                    $pdo->beginTransaction();
+                    
+                    try {
+                        // Удаляем пользователя
+                        $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+                        $stmt->execute([$userIdToDelete]);
+                        
+                        // Если пользователь был привязан к промокоду, обновляем статус промокода
+                        if ($userToDelete['promo_code_id']) {
+                            $stmt = $pdo->prepare("UPDATE promo_codes SET status = 'unregistered', updated_at = datetime('now') WHERE id = ?");
+                            $stmt->execute([$userToDelete['promo_code_id']]);
+                        }
+                        
+                        $pdo->commit();
+                        
+                        // Перенаправляем на страницу списка пользователей с сообщением об успехе
+                        header("Location: /users_report.php?message=" . urlencode("Пользователь '{$userToDelete['full_name']}' успешно удален из системы") . "&type=success");
+                        exit;
+                    } catch (Exception $e) {
+                        $pdo->rollBack();
+                        throw $e;
+                    }
+                }
+            } catch (Exception $e) {
+                $message = 'Ошибка при удалении пользователя: ' . $e->getMessage();
+                $messageType = 'error';
+            }
+        }
+        
+        // Перенаправляем чтобы обновить данные
+        header("Location: /user_profile.php?id=$doctorId&message=" . urlencode($message) . "&type=" . urlencode($messageType));
+        exit;
+    }
+
     // Обработка удаления списаний
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_deduction') {
         $deductionId = (int)($_POST['deduction_id'] ?? 0);
@@ -358,13 +410,27 @@ try {
         <!-- Информация о враче -->
         <div class="bg-white shadow rounded-lg mb-8">
             <div class="px-4 py-5 sm:p-6">
-                <div class="mb-6">
-                    <h1 class="text-2xl font-bold text-gray-900">
-                        <?= htmlspecialchars($doctor['full_name']) ?>
-                    </h1>
-                    <p class="text-gray-600">
-                        ID пользователя: <?= $doctor['id'] ?>
-                    </p>
+                <div class="mb-6 flex justify-between items-start">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900">
+                            <?= htmlspecialchars($doctor['full_name']) ?>
+                        </h1>
+                        <p class="text-gray-600">
+                            ID пользователя: <?= $doctor['id'] ?>
+                        </p>
+                    </div>
+                    <div>
+                        <form method="POST" class="inline" onsubmit="return confirm('Вы уверены, что хотите удалить пользователя из системы? Это действие нельзя отменить. Все данные пользователя будут удалены.')">
+                            <input type="hidden" name="action" value="delete_user">
+                            <input type="hidden" name="user_id" value="<?= $doctor['id'] ?>">
+                            <button type="submit" 
+                                    class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center"
+                                    title="Удалить пользователя">
+                                <i class="fas fa-trash mr-2"></i>
+                                Удалить пользователя
+                            </button>
+                        </form>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -152,6 +152,10 @@ try {
     $stats = ['total_users' => 0];
 }
 
+// Получаем сообщения из URL параметров
+$message = $_GET['message'] ?? '';
+$messageType = $_GET['type'] ?? '';
+
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -166,6 +170,27 @@ try {
 <?php include 'admin_navigation.php'; ?>
     
     <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <!-- Сообщения -->
+        <?php if (!empty($message)): ?>
+        <div class="mb-6">
+            <div class="rounded-md p-4 <?= $messageType === 'success' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200' ?>">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <?php if ($messageType === 'success'): ?>
+                            <i class="fas fa-check-circle text-green-400"></i>
+                        <?php else: ?>
+                            <i class="fas fa-exclamation-circle text-red-400"></i>
+                        <?php endif; ?>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm font-medium <?= $messageType === 'success' ? 'text-green-800' : 'text-red-800' ?>">
+                            <?= htmlspecialchars($message) ?>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
         <!-- Статистика -->
         <div class="grid grid-cols-1 md:grid-cols-1 gap-6 mb-8">
             <div class="bg-white overflow-hidden shadow rounded-lg">
