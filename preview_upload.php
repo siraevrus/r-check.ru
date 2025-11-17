@@ -30,22 +30,61 @@ if (!$uploadId) {
 }
 
 try {
-    // Получаем продажи, связанные с конкретной загрузкой через upload_period_id
-    $stmt = $pdo->prepare("
+    // Получаем информацию о загрузке
+    $stmt = $pdo->prepare("SELECT * FROM upload_history WHERE id = ?");
+    $stmt->execute([$uploadId]);
+    $upload = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$upload) {
+        echo json_encode(['success' => false, 'error' => 'Загрузка не найдена']);
+        exit;
+    }
+    
+    // Парсим период из error_log (формат: "Начало обработки файла - период: YYYY-MM-DD - YYYY-MM-DD")
+    $periodFrom = null;
+    $periodTo = null;
+    if (preg_match('/период:\s*(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})/i', $upload['error_log'] ?? '', $matches)) {
+        $periodFrom = $matches[1];
+        $periodTo = $matches[2];
+    }
+    
+    // Получаем продажи, созданные в момент загрузки или сразу после
+    // Используем created_at продаж для связи с created_at загрузки
+    // Также фильтруем по периоду sale_date, если период указан
+    $uploadCreatedAt = $upload['created_at'];
+    $uploadCreatedAtEnd = date('Y-m-d H:i:s', strtotime($uploadCreatedAt . ' +5 minutes')); // +5 минут для учета времени обработки
+    
+    $sql = "
         SELECT 
             pc.code as promo_code,
             s.product_name as product,
             s.quantity,
             s.sale_date,
-            uh.created_at as upload_date,
-            uh.error_log as description
+            ? as upload_date,
+            ? as description
         FROM sales s
         JOIN promo_codes pc ON s.promo_code_id = pc.id
-        JOIN upload_history uh ON s.upload_period_id = uh.id
-        WHERE uh.id = ?
-        ORDER BY s.created_at ASC
-    ");
-    $stmt->execute([$uploadId]);
+        WHERE s.created_at >= ? AND s.created_at <= ?
+    ";
+    
+    $params = [
+        $upload['created_at'],
+        $upload['error_log'] ?? '',
+        $uploadCreatedAt,
+        $uploadCreatedAtEnd
+    ];
+    
+    // Если период указан, дополнительно фильтруем по sale_date
+    if ($periodFrom && $periodTo) {
+        $sql .= " AND s.sale_date >= ? AND s.sale_date <= ?";
+        $params[] = $periodFrom;
+        $params[] = $periodTo;
+    }
+    
+    $sql .= " ORDER BY s.created_at ASC";
+    
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $salesData = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     echo json_encode([

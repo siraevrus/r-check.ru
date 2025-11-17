@@ -435,10 +435,11 @@ function parseFile($filePath, $extension, $pdo, $periodFrom, $periodTo) {
                 $saleId = null;
 
                 if ($existingSale) {
-                    // Запись существует в текущем периоде - обновляем количество (не суммируем!)
-                    $quantityDifference = $quantity - $existingSale['quantity']; // Разность для обновления total_sales
+                    // Запись существует - суммируем количество с существующим
+                    $newQuantity = $existingSale['quantity'] + $quantity;
+                    $quantityDifference = $quantity; // Добавляемое количество для обновления total_sales
                     $stmt = $pdo->prepare("UPDATE sales SET quantity = ? WHERE id = ?");
-                    $stmt->execute([$quantity, $existingSale['id']]);
+                    $stmt->execute([$newQuantity, $existingSale['id']]);
                     $saleId = $existingSale['id'];
                     $updated++;
                 } else {
