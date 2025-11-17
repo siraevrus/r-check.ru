@@ -34,7 +34,7 @@ try {
             break;
             
         case 'doctors':
-            exportDoctors($pdo, $sheet);
+            exportDoctors($pdo, $sheet, $_GET);
             $filename = 'users_report_' . date('Y-m-d_H-i-s') . '.xlsx';
             break;
             
@@ -114,8 +114,116 @@ function exportPromoCodes($pdo, $sheet) {
     }
 }
 
-function exportDoctors($pdo, $sheet) {
+function exportDoctors($pdo, $sheet, $filters = []) {
     $sheet->setTitle('Пользователи');
+    
+    // Получаем параметры фильтрации
+    $filterCity = $filters['city'] ?? '';
+    $filterStatus = $filters['status'] ?? '';
+    $sortBy = $filters['sort'] ?? 'created_at';
+    $sortOrder = $filters['order'] ?? 'desc';
+    
+    // Валидация параметров сортировки
+    $allowedSorts = ['total_sales', 'full_name', 'city', 'created_at'];
+    $sortBy = in_array($sortBy, $allowedSorts) ? $sortBy : 'created_at';
+    $sortOrder = in_array($sortOrder, ['asc', 'desc']) ? $sortOrder : 'desc';
+    
+    // Формируем условия WHERE для первого запроса (пользователи)
+    $whereConditions1 = [];
+    $params1 = [];
+    
+    if (!empty($filterCity)) {
+        $whereConditions1[] = "u.city = ?";
+        $params1[] = $filterCity;
+    }
+    
+    if (!empty($filterStatus)) {
+        if ($filterStatus === 'registered') {
+            $whereConditions1[] = "u.promo_code_id IS NOT NULL";
+        } elseif ($filterStatus === 'unregistered') {
+            $whereConditions1[] = "u.promo_code_id IS NULL";
+        }
+    }
+    
+    $whereClause1 = !empty($whereConditions1) ? 'WHERE ' . implode(' AND ', $whereConditions1) : '';
+    
+    // Формируем условия для второго запроса (промокоды без пользователей)
+    $whereConditions2 = ["u.id IS NULL"];
+    $params2 = [];
+    
+    // Определяем, нужно ли включать промокоды без пользователей
+    $includeUnregisteredPromos = false;
+    
+    // Если фильтр по статусу "registered", то промокоды без пользователей не включаем
+    if ($filterStatus === 'registered') {
+        $includeUnregisteredPromos = false;
+    } 
+    // Если фильтр по статусу "unregistered" - всегда включаем промокоды без пользователей
+    // (они тоже имеют статус "незарегистрированные")
+    elseif ($filterStatus === 'unregistered') {
+        // Включаем промокоды без пользователей только если не установлен фильтр по городу
+        // (у промокодов без пользователей нет города)
+        if (empty($filterCity)) {
+            $includeUnregisteredPromos = true;
+        }
+    }
+    // Если фильтр не установлен, включаем промокоды без пользователей только если не установлен фильтр по городу
+    else {
+        if (empty($filterCity)) {
+            $includeUnregisteredPromos = true;
+        }
+    }
+    
+    $whereClause2 = 'WHERE ' . implode(' AND ', $whereConditions2);
+    
+    // Формируем SQL запрос
+    $sql = "
+        SELECT 
+            u.id,
+            u.full_name,
+            u.email,
+            u.city,
+            pc.code as promo_code,
+            CASE 
+                WHEN u.promo_code_id IS NOT NULL THEN 'Зарегистрирован'
+                ELSE 'Не зарегистрирован'
+            END as registration_status,
+            COALESCE(pc.total_sales, 0) as total_sales,
+            COALESCE(u.created_at, pc.created_at) as created_at
+        FROM users u
+        LEFT JOIN promo_codes pc ON u.promo_code_id = pc.id
+        {$whereClause1}
+    ";
+    
+    if ($includeUnregisteredPromos) {
+        $sql .= "
+        UNION
+        
+        SELECT 
+            NULL as id,
+            NULL as full_name,
+            NULL as email,
+            NULL as city,
+            pc.code as promo_code,
+            'Не зарегистрирован' as registration_status,
+            COALESCE(pc.total_sales, 0) as total_sales,
+            pc.created_at
+        FROM promo_codes pc
+        LEFT JOIN users u ON u.promo_code_id = pc.id
+        {$whereClause2}
+        ";
+    }
+    
+    // Маппинг полей сортировки
+    $sortFieldMap = [
+        'total_sales' => 'total_sales',
+        'full_name' => 'full_name',
+        'city' => 'city',
+        'created_at' => 'created_at'
+    ];
+    $sortField = $sortFieldMap[$sortBy] ?? 'created_at';
+    
+    $sql .= " ORDER BY {$sortField} {$sortOrder}";
     
     // Заголовки согласно требованиям
     $headers = ['ПОЛЬЗОВАТЕЛЬ', 'EMAIL', 'ГОРОД', 'ПРОМОКОД', 'СТАТУС', 'ПРОДАЖИ', 'ДАТА РЕГИСТРАЦИИ'];
@@ -130,32 +238,16 @@ function exportDoctors($pdo, $sheet) {
           ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
           ->getStartColor()->setARGB('FFE0E0E0');
     
-    // Данные
-    $stmt = $pdo->query("
-        SELECT 
-            u.id,
-            u.full_name,
-            u.email,
-            u.city,
-            pc.code as promo_code,
-            CASE 
-                WHEN u.promo_code_id IS NOT NULL THEN 'Зарегистрирован'
-                ELSE 'Не зарегистрирован'
-            END as registration_status,
-            COALESCE(pc.total_sales, 0) as total_sales,
-            u.created_at
-        FROM users u
-        LEFT JOIN promo_codes pc ON u.promo_code_id = pc.id
-        GROUP BY u.id, u.full_name, u.email, u.city, pc.code, pc.total_sales, u.created_at
-        ORDER BY u.created_at DESC
-    ");
+    // Выполняем запрос
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute(array_merge($params1, $params2));
     
     $row = 2;
     while ($data = $stmt->fetch()) {
         $col = 1;
-        $sheet->setCellValueByColumnAndRow($col++, $row, $data['full_name']);
-        $sheet->setCellValueByColumnAndRow($col++, $row, $data['email']);
-        $sheet->setCellValueByColumnAndRow($col++, $row, $data['city']);
+        $sheet->setCellValueByColumnAndRow($col++, $row, $data['full_name'] ?? '-');
+        $sheet->setCellValueByColumnAndRow($col++, $row, $data['email'] ?? '-');
+        $sheet->setCellValueByColumnAndRow($col++, $row, $data['city'] ?? '-');
         $sheet->setCellValueByColumnAndRow($col++, $row, $data['promo_code'] ?? '-');
         $sheet->setCellValueByColumnAndRow($col++, $row, $data['registration_status']);
         $sheet->setCellValueByColumnAndRow($col++, $row, $data['total_sales']);

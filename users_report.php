@@ -38,24 +38,38 @@ $citiesStmt = $pdo->query("SELECT DISTINCT city FROM users WHERE city IS NOT NUL
 $cities = $citiesStmt->fetchAll(PDO::FETCH_COLUMN);
 
 // Формируем SQL запрос с фильтрами
-$whereConditions = [];
-$params = [];
+$whereConditions1 = [];
+$params1 = [];
 
 if (!empty($filterCity)) {
-    $whereConditions[] = "u.city = ?";
-    $params[] = $filterCity;
+    $whereConditions1[] = "u.city = ?";
+    $params1[] = $filterCity;
 }
 
 if (!empty($filterStatus)) {
     if ($filterStatus === 'registered') {
-        $whereConditions[] = "u.promo_code_id IS NOT NULL";
+        $whereConditions1[] = "u.promo_code_id IS NOT NULL";
     } elseif ($filterStatus === 'unregistered') {
-        $whereConditions[] = "u.promo_code_id IS NULL";
+        $whereConditions1[] = "u.promo_code_id IS NULL";
     }
 }
 
-$whereClause = !empty($whereConditions) ? 'WHERE ' . implode(' AND ', $whereConditions) : '';
+$whereClause1 = !empty($whereConditions1) ? 'WHERE ' . implode(' AND ', $whereConditions1) : '';
 
+// Определяем, нужно ли включать промокоды без пользователей
+$includeUnregisteredPromos = false;
+if ($filterStatus === 'registered') {
+    $includeUnregisteredPromos = false;
+} elseif ($filterStatus === 'unregistered' || empty($filterStatus)) {
+    // Включаем промокоды без пользователей только если не установлен фильтр по городу
+    if (empty($filterCity)) {
+        $includeUnregisteredPromos = true;
+    }
+}
+
+$whereClause2 = 'WHERE u.id IS NULL';
+
+// Формируем SQL запрос
 $sql = "
     SELECT 
         u.id,
@@ -74,19 +88,54 @@ $sql = "
     FROM users u
     LEFT JOIN promo_codes pc ON u.promo_code_id = pc.id
     LEFT JOIN sales s ON s.promo_code_id = pc.id
-    {$whereClause}
+    {$whereClause1}
     GROUP BY u.id, u.full_name, u.email, u.city, u.created_at, pc.code, pc.total_sales
-    ORDER BY {$sortBy} {$sortOrder}
 ";
+
+if ($includeUnregisteredPromos) {
+    $sql .= "
+    UNION
+    
+    SELECT 
+        NULL as id,
+        NULL as full_name,
+        NULL as email,
+        NULL as city,
+        pc.created_at,
+        pc.code as promo_code,
+        COUNT(s.id) as sales_count,
+        COALESCE(SUM(s.quantity), 0) as total_quantity,
+        COALESCE(pc.total_sales, 0) as total_sales,
+        'unregistered' as registration_status
+    FROM promo_codes pc
+    LEFT JOIN users u ON u.promo_code_id = pc.id
+    LEFT JOIN sales s ON s.promo_code_id = pc.id
+    {$whereClause2}
+    GROUP BY pc.id, pc.code, pc.total_sales, pc.created_at
+    ";
+}
+
+// Маппинг полей сортировки для совместимости
+$sortFieldMap = [
+    'sales_count' => 'sales_count',
+    'total_quantity' => 'total_quantity',
+    'total_sales' => 'total_sales',
+    'full_name' => 'full_name',
+    'city' => 'city',
+    'created_at' => 'created_at'
+];
+$sortField = $sortFieldMap[$sortBy] ?? 'created_at';
+
+$sql .= " ORDER BY {$sortField} {$sortOrder}";
 
 try {
     $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
+    $stmt->execute($params1);
     $users = $stmt->fetchAll();
 } catch (PDOException $e) {
     error_log("SQL Error in users_report.php: " . $e->getMessage());
     error_log("SQL Query: " . $sql);
-    error_log("Parameters: " . print_r($params, true));
+    error_log("Parameters: " . print_r($params1, true));
     die("Ошибка выполнения запроса: " . $e->getMessage());
 }
 
@@ -202,7 +251,23 @@ try {
                         Список пользователей (<?= count($users) ?>)
                     </h3>
                     <div>
-                        <a href="/export_excel.php?type=doctors" 
+                        <?php
+                        $exportParams = ['type' => 'doctors'];
+                        if (!empty($filterCity)) {
+                            $exportParams['city'] = $filterCity;
+                        }
+                        if (!empty($filterStatus)) {
+                            $exportParams['status'] = $filterStatus;
+                        }
+                        if (!empty($sortBy)) {
+                            $exportParams['sort'] = $sortBy;
+                        }
+                        if (!empty($sortOrder)) {
+                            $exportParams['order'] = $sortOrder;
+                        }
+                        $exportUrl = '/export_excel.php?' . http_build_query($exportParams);
+                        ?>
+                        <a href="<?= htmlspecialchars($exportUrl) ?>" 
                            class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
                             <i class="fas fa-file-excel mr-2"></i>Выгрузить отчет
                         </a>
@@ -226,15 +291,19 @@ try {
                             <?php foreach ($users as $user): ?>
                             <tr>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    <a href="/user_profile.php?id=<?= $user['id'] ?>" class="text-blue-600 hover:text-blue-800 hover:underline">
-                                        <?= htmlspecialchars($user['full_name']) ?>
-                                    </a>
+                                    <?php if ($user['id']): ?>
+                                        <a href="/user_profile.php?id=<?= $user['id'] ?>" class="text-blue-600 hover:text-blue-800 hover:underline">
+                                            <?= htmlspecialchars($user['full_name'] ?? '-') ?>
+                                        </a>
+                                    <?php else: ?>
+                                        <?= htmlspecialchars($user['full_name'] ?? '-') ?>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    <?= htmlspecialchars($user['email']) ?>
+                                    <?= htmlspecialchars($user['email'] ?? '-') ?>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    <?= htmlspecialchars($user['city']) ?>
+                                    <?= htmlspecialchars($user['city'] ?? '-') ?>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
                                     <?= htmlspecialchars($user['promo_code'] ?? '-') ?>
@@ -245,10 +314,10 @@ try {
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">
-                                    <?= number_format($user['total_sales'], 0, ',', ' ') ?>
+                                    <?= number_format($user['total_sales'] ?? 0, 0, ',', ' ') ?>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    <?= date('d.m.Y', strtotime($user['created_at'])) ?>
+                                    <?= $user['created_at'] ? date('d.m.Y', strtotime($user['created_at'])) : '-' ?>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
