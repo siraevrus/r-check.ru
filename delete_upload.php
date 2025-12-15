@@ -43,15 +43,71 @@ try {
         exit;
     }
     
-    // Получаем все продажи (так как нет связи через upload_period_id)
-    $stmt = $pdo->prepare("
+    // Парсим период из error_log (формат: "период: YYYY-MM-DD - YYYY-MM-DD")
+    $periodFrom = null;
+    $periodTo = null;
+    $errorLog = $upload['error_log'] ?? '';
+    
+    // Пробуем разные варианты формата периода
+    if (preg_match('/период:\s*(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})/i', $errorLog, $matches)) {
+        $periodFrom = $matches[1];
+        $periodTo = $matches[2];
+    } elseif (preg_match('/(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})/i', $errorLog, $matches)) {
+        // Альтернативный формат без слова "период"
+        $periodFrom = $matches[1];
+        $periodTo = $matches[2];
+    }
+    
+    // Формируем SQL запрос для получения продаж, связанных с этой загрузкой
+    $sql = "
         SELECT s.*, pc.code as promo_code
         FROM sales s
         JOIN promo_codes pc ON s.promo_code_id = pc.id
-        ORDER BY s.created_at DESC
-    ");
-    $stmt->execute();
+        WHERE 1=1
+    ";
+    $params = [];
+    
+    // Если период указан, используем его как основной критерий поиска
+    if ($periodFrom && $periodTo) {
+        $sql .= " AND s.sale_date >= ? AND s.sale_date <= ?";
+        $params[] = $periodFrom;
+        $params[] = $periodTo;
+    } else {
+        // Если период не указан, используем временное окно (30 минут от created_at загрузки)
+        // для учета времени обработки больших файлов, особенно XLSX
+        $uploadCreatedAt = $upload['created_at'];
+        $uploadCreatedAtEnd = date('Y-m-d H:i:s', strtotime($uploadCreatedAt . ' +30 minutes'));
+        $sql .= " AND s.created_at >= ? AND s.created_at <= ?";
+        $params[] = $uploadCreatedAt;
+        $params[] = $uploadCreatedAtEnd;
+    }
+    
+    $sql .= " ORDER BY s.created_at DESC";
+    
+    // Логируем для отладки
+    error_log("Delete upload ID {$uploadId}: periodFrom={$periodFrom}, periodTo={$periodTo}, error_log=" . substr($errorLog, 0, 100));
+    
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $salesToDelete = $stmt->fetchAll();
+    
+    // Логируем количество найденных записей
+    $foundCount = count($salesToDelete);
+    error_log("Delete upload ID {$uploadId}: найдено записей для удаления: {$foundCount}");
+    
+    // Защита от случайного удаления всех данных
+    // Если период не найден и найдено слишком много записей (>1000), отменяем удаление
+    if (!$periodFrom || !$periodTo) {
+        if ($foundCount > 1000) {
+            $pdo->rollBack();
+            error_log("Delete upload ID {$uploadId}: ОТМЕНЕНО - период не найден и найдено слишком много записей ({$foundCount})");
+            echo json_encode([
+                'success' => false, 
+                'error' => 'Не удалось определить период загрузки. Удаление отменено для защиты данных. Найдено записей: ' . $foundCount
+            ]);
+            exit;
+        }
+    }
     
     $deletedCount = 0;
     $deletedSales = 0;

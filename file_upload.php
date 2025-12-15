@@ -132,6 +132,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $totalSales = $result['total_sales'] ?? 0;
                             $recordsCount = $result['processed'] ?? 0;
 
+                            // Сохраняем период в error_log для возможности предпросмотра
+                            $periodInfo = "период: $periodFrom - $periodTo";
+                            $statusMessage = "Загружено {$result['added']} новых записей, обновлено {$result['updated']} существующих. {$periodInfo}";
+                            
                             $stmt = $pdo->prepare("
                                 UPDATE upload_history
                                 SET rows_processed = ?, rows_success = ?, status = ?, error_log = ?
@@ -141,7 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $recordsCount,
                                 $result['added'] + $result['updated'],
                                 'completed',
-                                "Загружено {$result['added']} новых записей, обновлено {$result['updated']} существующих",
+                                $statusMessage,
                                 $result['upload_period_id']
                             ]);
 
@@ -564,6 +568,17 @@ function parseFile($filePath, $extension, $pdo, $periodFrom, $periodTo) {
         @keyframes slideIn {
             from { transform: translateY(-50px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
+        }
+        .preview-table-container {
+            max-height: 500px;
+            overflow-y: auto;
+            overflow-x: auto;
+        }
+        .preview-table-container thead th {
+            position: sticky;
+            top: 0;
+            background-color: #f9fafb;
+            z-index: 10;
         }
     </style>
 </head>
@@ -1006,7 +1021,7 @@ NEWCODE1,Новый продукт,2025-10-08,10</pre>
                             </div>
                         </div>
                         <div class="px-6 py-4">
-                            <div class="overflow-x-auto">
+                            <div class="preview-table-container">
                                 <table class="min-w-full divide-y divide-gray-200">
                                     <thead class="bg-gray-50">
                                         <tr>
