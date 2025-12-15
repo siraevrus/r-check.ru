@@ -158,30 +158,11 @@ try {
     $promoCodesWithSales = $promoCodesWithSalesStmt->fetch();
     $stats['promo_codes_with_sales'] = $promoCodesWithSales['promo_codes_with_sales'] ?? 0;
     
-    // Зарегистрированные промокоды с продажами, но без привязанных пользователей
-    $registeredPromosWithoutUsersStmt = $pdo->query("
-        SELECT 
-            pc.id,
-            pc.code,
-            COUNT(s.id) as sales_count,
-            COALESCE(SUM(s.quantity), 0) as total_quantity
-        FROM promo_codes pc
-        INNER JOIN sales s ON s.promo_code_id = pc.id
-        LEFT JOIN users u ON u.promo_code_id = pc.id
-        WHERE pc.status = 'registered'
-          AND u.id IS NULL
-        GROUP BY pc.id, pc.code
-        ORDER BY sales_count DESC
-    ");
-    $registeredPromosWithoutUsers = $registeredPromosWithoutUsersStmt->fetchAll(PDO::FETCH_ASSOC);
-    $stats['registered_promos_without_users'] = $registeredPromosWithoutUsers;
-    
 } catch (PDOException $e) {
     error_log("SQL Error in stats query: " . $e->getMessage());
     $stats = [
         'total_users' => 0,
-        'promo_codes_with_sales' => 0,
-        'registered_promos_without_users' => []
+        'promo_codes_with_sales' => 0
     ];
 }
 
@@ -225,7 +206,7 @@ $messageType = $_GET['type'] ?? '';
         </div>
         <?php endif; ?>
         <!-- Статистика -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <!-- Количество промокодов с продажами -->
             <div class="bg-white overflow-hidden shadow rounded-lg">
                 <div class="p-5">
@@ -259,62 +240,7 @@ $messageType = $_GET['type'] ?? '';
                     </div>
                 </div>
             </div>
-            
-            <!-- Зарегистрированные промокоды с продажами без пользователей -->
-            <div class="bg-white overflow-hidden shadow rounded-lg">
-                <div class="p-5">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-exclamation-triangle text-orange-600 text-2xl"></i>
-                        </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Промокодов без пользователей</dt>
-                                <dd class="text-lg font-medium text-gray-900"><?= count($stats['registered_promos_without_users'] ?? []) ?></dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
-        
-        <!-- Список зарегистрированных промокодов с продажами, но без привязанных пользователей -->
-        <?php if (!empty($stats['registered_promos_without_users'])): ?>
-        <div class="bg-white shadow rounded-lg mb-8">
-            <div class="px-4 py-5 sm:p-6">
-                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
-                    <i class="fas fa-exclamation-triangle text-orange-600 mr-2"></i>
-                    Зарегистрированные промокоды с продажами без привязанных пользователей
-                </h3>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Промокод</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Количество продаж</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Общее количество</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            <?php foreach ($stats['registered_promos_without_users'] as $promo): ?>
-                            <tr>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                                    <?= htmlspecialchars($promo['code']) ?>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    <?= number_format($promo['sales_count'], 0, ',', ' ') ?>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">
-                                    <?= number_format($promo['total_quantity'], 0, ',', ' ') ?>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-        <?php endif; ?>
         
         <!-- Фильтры -->
         <div class="bg-white shadow rounded-lg mb-8">

@@ -22,10 +22,19 @@ class FileController
         
         $file = $_FILES['file'];
         $allowedTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/plain'];
+        $allowedExtensions = ['csv', 'xls', 'xlsx', 'txt'];
         
-        if (!in_array($file['type'], $allowedTypes)) {
+        // Проверка расширения файла
+        $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if (!in_array($fileExtension, $allowedExtensions)) {
             Response::error('Неподдерживаемый тип файла. Разрешены: CSV, XLS, XLSX, TXT', 400);
             return;
+        }
+        
+        // Проверка MIME-типа (дополнительная проверка)
+        if (!in_array($file['type'], $allowedTypes) && $file['type'] !== 'application/octet-stream') {
+            // Если MIME-тип не совпадает, но расширение правильное, все равно разрешаем
+            // (некоторые браузеры могут отправлять неправильные MIME-типы)
         }
         
         $maxSize = 5 * 1024 * 1024; // 5MB
@@ -35,7 +44,7 @@ class FileController
         }
         
         try {
-            $codes = $this->parsePromoCodesFile($file['tmp_name'], $file['type']);
+            $codes = $this->parsePromoCodesFile($file['tmp_name'], $file['type'], $file['name']);
             $addedCount = PromoCode::batchCreate($codes);
             
             Response::success([
@@ -59,10 +68,19 @@ class FileController
         
         $file = $_FILES['file'];
         $allowedTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+        $allowedExtensions = ['csv', 'xls', 'xlsx'];
         
-        if (!in_array($file['type'], $allowedTypes)) {
+        // Проверка расширения файла
+        $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if (!in_array($fileExtension, $allowedExtensions)) {
             Response::error('Неподдерживаемый тип файла. Разрешены: CSV, XLS, XLSX', 400);
             return;
+        }
+        
+        // Проверка MIME-типа (дополнительная проверка)
+        if (!in_array($file['type'], $allowedTypes) && $file['type'] !== 'application/octet-stream') {
+            // Если MIME-тип не совпадает, но расширение правильное, все равно разрешаем
+            // (некоторые браузеры могут отправлять неправильные MIME-типы)
         }
         
         $maxSize = 10 * 1024 * 1024; // 10MB
@@ -72,7 +90,7 @@ class FileController
         }
         
         try {
-            $salesData = $this->parseSalesReportFile($file['tmp_name'], $file['type']);
+            $salesData = $this->parseSalesReportFile($file['tmp_name'], $file['type'], $file['name']);
             $addedCount = Sale::batchCreate($salesData);
             
             Response::success([
@@ -85,11 +103,15 @@ class FileController
         }
     }
     
-    private function parsePromoCodesFile(string $filePath, string $mimeType): array
+    private function parsePromoCodesFile(string $filePath, string $mimeType, string $fileName = ''): array
     {
         $codes = [];
         
-        if (strpos($mimeType, 'csv') !== false || strpos($mimeType, 'text') !== false) {
+        // Определяем тип файла по расширению или MIME-типу
+        $fileExtension = $fileName ? strtolower(pathinfo($fileName, PATHINFO_EXTENSION)) : '';
+        $isCsv = in_array($fileExtension, ['csv', 'txt']) || strpos($mimeType, 'csv') !== false || strpos($mimeType, 'text') !== false;
+        
+        if ($isCsv) {
             // Обработка CSV/TXT файлов
             $handle = fopen($filePath, 'r');
             if ($handle === false) {
@@ -122,11 +144,15 @@ class FileController
         });
     }
     
-    private function parseSalesReportFile(string $filePath, string $mimeType): array
+    private function parseSalesReportFile(string $filePath, string $mimeType, string $fileName = ''): array
     {
         $salesData = [];
         
-        if (strpos($mimeType, 'csv') !== false) {
+        // Определяем тип файла по расширению или MIME-типу
+        $fileExtension = $fileName ? strtolower(pathinfo($fileName, PATHINFO_EXTENSION)) : '';
+        $isCsv = $fileExtension === 'csv' || strpos($mimeType, 'csv') !== false;
+        
+        if ($isCsv) {
             // Обработка CSV файлов
             $handle = fopen($filePath, 'r');
             if ($handle === false) {
