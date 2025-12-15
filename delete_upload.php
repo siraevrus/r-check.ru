@@ -152,10 +152,60 @@ try {
     $foundCount = count($salesToDelete);
     error_log("Delete upload ID {$uploadId}: найдено записей для удаления: {$foundCount}");
     
-    // Если записей не найдено, возвращаем ошибку
+    // Дополнительная проверка: сколько всего записей в базе
+    $totalStmt = $pdo->query("SELECT COUNT(*) FROM sales");
+    $totalSalesInDb = $totalStmt->fetchColumn();
+    error_log("Delete upload ID {$uploadId}: всего записей в таблице sales: {$totalSalesInDb}");
+    
+    // Если записей не найдено, проверяем ситуацию
     if ($foundCount === 0) {
+        // Проверяем, есть ли вообще записи в базе
+        $totalStmt = $pdo->query("SELECT COUNT(*) FROM sales");
+        $totalSalesInDb = $totalStmt->fetchColumn();
+        
+        // Если в базе нет записей в sales, но есть данные в promo_codes.total_sales,
+        // значит данные были удалены ранее, но total_sales не был обнулен
+        // В этом случае просто обнуляем total_sales для всех промокодов и удаляем запись загрузки
+        if ($totalSalesInDb === 0) {
+            error_log("Delete upload ID {$uploadId}: В базе нет записей в sales, обнуляем total_sales в promo_codes");
+            
+            // Обнуляем total_sales для всех промокодов
+            $stmt = $pdo->prepare("UPDATE promo_codes SET total_sales = 0, updated_at = datetime('now')");
+            $stmt->execute();
+            
+            // Удаляем запись из истории загрузок
+            $stmt = $pdo->prepare("DELETE FROM upload_history WHERE id = ?");
+            $stmt->execute([$uploadId]);
+            
+            $pdo->commit();
+            
+            // Проверяем, были ли вообще total_sales до обнуления
+            $totalSalesBefore = $pdo->query("SELECT SUM(total_sales) FROM promo_codes")->fetchColumn();
+            
+            echo json_encode([
+                'success' => true, 
+                'message' => 'Загрузка удалена. Записи в sales отсутствовали, обнулены total_sales в promo_codes.',
+                'deleted_count' => 0,
+                'deleted_sales' => 0,
+                'total_sales_before_reset' => $totalSalesBefore,
+                'note' => 'Данные в sales уже были удалены ранее, обнулены total_sales в promo_codes'
+            ]);
+            exit;
+        }
+        
+        // Если записи есть, но не найдены по критериям - возвращаем ошибку с детальной информацией
+        $datesStmt = $pdo->query("SELECT DISTINCT sale_date FROM sales ORDER BY sale_date DESC LIMIT 10");
+        $datesInDb = $datesStmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        $createdStmt = $pdo->query("SELECT DISTINCT DATE(created_at) as created_date FROM sales ORDER BY created_date DESC LIMIT 10");
+        $createdDatesInDb = $createdStmt->fetchAll(PDO::FETCH_COLUMN);
+        
         $pdo->rollBack();
         error_log("Delete upload ID {$uploadId}: ОТМЕНЕНО - не найдено записей для удаления");
+        error_log("Delete upload ID {$uploadId}: Всего записей в БД: {$totalSalesInDb}");
+        error_log("Delete upload ID {$uploadId}: Даты продаж в БД: " . json_encode($datesInDb));
+        error_log("Delete upload ID {$uploadId}: Даты создания в БД: " . json_encode($createdDatesInDb));
+        
         echo json_encode([
             'success' => false, 
             'error' => 'Не найдено записей для удаления. Возможно, данные уже были удалены или период указан неверно.',
@@ -163,7 +213,11 @@ try {
                 'period_from' => $periodFrom,
                 'period_to' => $periodTo,
                 'error_log' => substr($errorLog, 0, 200),
-                'upload_created_at' => $upload['created_at'] ?? null
+                'upload_created_at' => $upload['created_at'] ?? null,
+                'total_sales_in_db' => $totalSalesInDb,
+                'sale_dates_in_db' => $datesInDb,
+                'created_dates_in_db' => $createdDatesInDb,
+                'search_method' => $periodFrom && $periodTo ? 'by_period' : 'by_time_window'
             ]
         ]);
         exit;
