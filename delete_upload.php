@@ -63,6 +63,7 @@ try {
     
     // Если период указан, используем его как основной критерий поиска
     if ($periodFrom && $periodTo) {
+        // Сначала пробуем найти по sale_date в периоде
         $sql = "
             SELECT s.*, pc.code as promo_code
             FROM sales s
@@ -77,6 +78,33 @@ try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $salesToDelete = $stmt->fetchAll();
+        
+        // Если не найдено по sale_date, пробуем найти по created_at в день загрузки
+        // (на случай, если sale_date не совпадает с периодом)
+        if (count($salesToDelete) === 0) {
+            $uploadCreatedAt = $upload['created_at'];
+            // Используем более широкое окно: от начала дня загрузки до конца дня
+            $uploadDate = date('Y-m-d', strtotime($uploadCreatedAt));
+            $uploadCreatedAtStart = $uploadDate . ' 00:00:00';
+            $uploadCreatedAtEnd = $uploadDate . ' 23:59:59';
+            
+            error_log("Delete upload ID {$uploadId}: не найдено по sale_date в периоде {$periodFrom} - {$periodTo}, пробуем по created_at в день загрузки ({$uploadCreatedAtStart} - {$uploadCreatedAtEnd})");
+            
+            $sqlAlt = "
+                SELECT s.*, pc.code as promo_code
+                FROM sales s
+                JOIN promo_codes pc ON s.promo_code_id = pc.id
+                WHERE s.created_at >= ? AND s.created_at <= ?
+                ORDER BY s.created_at DESC
+            ";
+            $stmt = $pdo->prepare($sqlAlt);
+            $stmt->execute([$uploadCreatedAtStart, $uploadCreatedAtEnd]);
+            $salesToDelete = $stmt->fetchAll();
+            
+            if (count($salesToDelete) > 0) {
+                error_log("Delete upload ID {$uploadId}: найдено " . count($salesToDelete) . " записей по created_at в день загрузки");
+            }
+        }
     } else {
         // Если период не указан, используем более широкое временное окно
         // Пробуем найти данные за день до и после загрузки (на случай, если данные были созданы раньше)
