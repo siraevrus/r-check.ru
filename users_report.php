@@ -158,11 +158,29 @@ try {
     $promoCodesWithSales = $promoCodesWithSalesStmt->fetch();
     $stats['promo_codes_with_sales'] = $promoCodesWithSales['promo_codes_with_sales'] ?? 0;
     
+    // Количество проданных товаров (сумма всех quantity из sales)
+    $totalQuantityStmt = $pdo->query("
+        SELECT COALESCE(SUM(quantity), 0) as total_quantity
+        FROM sales
+    ");
+    $totalQuantity = $totalQuantityStmt->fetch();
+    $stats['total_quantity'] = $totalQuantity['total_quantity'] ?? 0;
+    
+    // Общая сумма из столбца ПРОДАЖИ (сумма всех total_sales из promo_codes)
+    $totalSalesStmt = $pdo->query("
+        SELECT COALESCE(SUM(total_sales), 0) as total_sales_sum
+        FROM promo_codes
+    ");
+    $totalSales = $totalSalesStmt->fetch();
+    $stats['total_sales_sum'] = $totalSales['total_sales_sum'] ?? 0;
+    
 } catch (PDOException $e) {
     error_log("SQL Error in stats query: " . $e->getMessage());
     $stats = [
         'total_users' => 0,
-        'promo_codes_with_sales' => 0
+        'promo_codes_with_sales' => 0,
+        'total_quantity' => 0,
+        'total_sales_sum' => 0
     ];
 }
 
@@ -206,7 +224,7 @@ $messageType = $_GET['type'] ?? '';
         </div>
         <?php endif; ?>
         <!-- Статистика -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <!-- Количество промокодов с продажами -->
             <div class="bg-white overflow-hidden shadow rounded-lg">
                 <div class="p-5">
@@ -235,6 +253,40 @@ $messageType = $_GET['type'] ?? '';
                             <dl>
                                 <dt class="text-sm font-medium text-gray-500 truncate">Зарегистрированных пользователей</dt>
                                 <dd class="text-lg font-medium text-gray-900"><?= $stats['total_users'] ?? 0 ?></dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Количество проданных товаров -->
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-box text-purple-600 text-2xl"></i>
+                        </div>
+                        <div class="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">Количество проданных товаров</dt>
+                                <dd class="text-lg font-medium text-gray-900"><?= number_format($stats['total_quantity'] ?? 0, 0, ',', ' ') ?></dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Общая сумма продаж -->
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-ruble-sign text-orange-600 text-2xl"></i>
+                        </div>
+                        <div class="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">Общая сумма продаж</dt>
+                                <dd class="text-lg font-medium text-gray-900"><?= number_format($stats['total_sales_sum'] ?? 0, 0, ',', ' ') ?></dd>
                             </dl>
                         </div>
                     </div>
