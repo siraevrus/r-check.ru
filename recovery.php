@@ -1,9 +1,13 @@
 <?php
 
 require_once __DIR__ . '/vendor/autoload.php';
+use ReproCRM\Config\Config;
 use ReproCRM\Config\Database;
 use ReproCRM\Utils\Validator;
 use ReproCRM\Utils\EmailNotifier;
+
+// Загружаем конфигурацию из config.env
+Config::load();
 
 $_ENV['DB_TYPE'] = 'sqlite';
 $db = Database::getInstance();
@@ -36,14 +40,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $newPassword = bin2hex(random_bytes(6)); // 12-символьный пароль
                 $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
                 
+                // Логируем для отладки (удалить в продакшене)
+                error_log("Password recovery: Generated new password for user ID {$user['id']}, email: {$email}");
+                
                 // Обновляем пароль в базе данных
                 $updateStmt = $pdo->prepare("UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?");
                 $updateStmt->execute([$passwordHash, $user['id']]);
+                
+                error_log("Password recovery: Password updated in database for user ID {$user['id']}");
                 
                 // Отправляем новый пароль на email
                 $subject = 'Ваш новый пароль - Система учета продаж';
                 $fullName = $user['full_name'] ?? 'Пользователь';
                 
+                error_log("Password recovery: Preparing email to {$email} with password: {$newPassword}");
+                
+                // Формируем тело письма с новым паролем
+                $appUrl = $_ENV['APP_URL'] ?? 'http://localhost:8000';
                 $emailBody = "
 <!DOCTYPE html>
 <html>
@@ -67,13 +80,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <h1>🔐 Восстановление пароля</h1>
         </div>
         <div class='content'>
-            <p>Здравствуйте, <strong>$fullName</strong>!</p>
+            <p>Здравствуйте, <strong>" . htmlspecialchars($fullName) . "</strong>!</p>
             
             <p>Ваш пароль был успешно восстановлен. Ниже находится ваш новый пароль:</p>
             
             <div class='password-box'>
                 <h2>Ваш новый пароль</h2>
-                <div class='password'>$newPassword</div>
+                <div class='password'>" . htmlspecialchars($newPassword) . "</div>
             </div>
             
             <div class='warning'>
@@ -88,8 +101,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             <p><strong>Как использовать новый пароль:</strong></p>
             <ol>
-                <li>Перейдите на <a href='" . ($_ENV['APP_URL'] ?? 'http://localhost:8000') . "/user.php'>страницу входа</a></li>
-                <li>Введите ваш email: <strong>$email</strong></li>
+                <li>Перейдите на <a href='{$appUrl}/user.php'>страницу входа</a></li>
+                <li>Введите ваш email: <strong>" . htmlspecialchars($email) . "</strong></li>
                 <li>Введите новый пароль (скопируйте выше)</li>
                 <li>Нажмите кнопку 'Войти'</li>
             </ol>
@@ -98,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
         <div class='footer'>
             <p>Это автоматическое письмо. Пожалуйста, не отвечайте на него.</p>
-            <p>© " . date('Y') . " Система учета продаж | <a href='" . ($_ENV['APP_URL'] ?? 'http://localhost:8000') . "'>Вернуться на сайт</a></p>
+            <p>© " . date('Y') . " Система учета продаж | <a href='{$appUrl}'>Вернуться на сайт</a></p>
         </div>
     </div>
 </body>
@@ -106,16 +119,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ";
                 
                 // Отправляем письмо
+                error_log("Password recovery: Attempting to send email to {$email}");
                 $emailResult = $emailNotifier->send($email, $subject, $emailBody, true);
                 
                 if ($emailResult) {
                     $message = 'Новый пароль был отправлен на указанный email. Проверьте почту и используйте полученный пароль для входа.';
                     $messageType = 'success';
-                    error_log("Password recovery successful for email: " . $email . " (User ID: " . $user['id'] . ")");
+                    error_log("Password recovery successful for email: " . $email . " (User ID: " . $user['id'] . ", Password: " . $newPassword . ")");
                 } else {
                     $message = 'Новый пароль был сгенерирован, но произошла ошибка при отправке письма. Пожалуйста, свяжитесь с администратором.';
                     $messageType = 'warning';
-                    error_log("Password reset for user but email sending failed: " . $email);
+                    error_log("Password reset for user but email sending failed: " . $email . " (Generated password: " . $newPassword . ")");
+                    // В случае ошибки отправки, показываем пароль пользователю (только для отладки)
+                    // В продакшене это нужно убрать!
+                    // $message .= " Временный пароль: " . $newPassword;
                 }
                 
             } catch (Exception $e) {
