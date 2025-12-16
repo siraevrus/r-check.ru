@@ -68,7 +68,7 @@ $message = "
         </div>
         <div class='footer'>
             <p>Это автоматическое тестовое письмо.</p>
-            <p>© " . date('Y') . " Система учета продаж | <a href='" . ($_ENV['APP_URL'] ?? 'http://localhost:8000') . "'>Вернуться на сайт</a></p>
+            <p>© " . date('Y') . " Система учета продаж | <a href='" . ($_ENV['APP_URL'] ?? 'http://r-check.ru') . "'>Вернуться на сайт</a></p>
         </div>
     </div>
 </body>

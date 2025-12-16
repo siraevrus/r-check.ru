@@ -155,7 +155,7 @@ class EmailNotifier
                     </div>
                     
                     <p>Используйте этот промокод для отслеживания ваших продаж в системе.</p>
-                    <p>Для входа в систему перейдите по ссылке: <a href='http://localhost:8000/doctor_panel.php'>Система РЕПРО</a></p>
+                    <p>Для входа в систему перейдите по ссылке: <a href='" . ($_ENV['APP_URL'] ?? 'http://r-check.ru') . "/doctor_panel.php'>Система РЕПРО</a></p>
                 </div>
                 <div class='footer'>
                     <p>Это автоматическое сообщение. Пожалуйста, не отвечайте на него.</p>
@@ -214,7 +214,7 @@ class EmailNotifier
                     <h3>Детализация продаж:</h3>
                     {$salesTable}
                     
-                    <p>Для просмотра полной статистики перейдите в систему: <a href='http://localhost:8000/user_dashboard.php'>Дашборд пользователя</a></p>
+                    <p>Для просмотра полной статистики перейдите в систему: <a href='" . ($_ENV['APP_URL'] ?? 'http://r-check.ru') . "/user_dashboard.php'>Дашборд пользователя</a></p>
                 </div>
                 <div class='footer'>
                     <p>Это автоматическое сообщение. Пожалуйста, не отвечайте на него.</p>
@@ -252,7 +252,7 @@ class EmailNotifier
                     <div class='alert'>
                         {$message}
                     </div>
-                    <p>Для просмотра подробной информации перейдите в административную панель: <a href='http://localhost:8000/admin_working.php'>Админ панель</a></p>
+                    <p>Для просмотра подробной информации перейдите в административную панель: <a href='" . ($_ENV['APP_URL'] ?? 'http://r-check.ru') . "/admin_working.php'>Админ панель</a></p>
                 </div>
                 <div class='footer'>
                     <p>Это автоматическое сообщение системы РЕПРО.</p>

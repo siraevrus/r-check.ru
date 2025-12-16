@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 error_log("Password recovery: Preparing email to {$email} with password: {$newPassword}");
                 
                 // Формируем тело письма с новым паролем
-                $appUrl = $_ENV['APP_URL'] ?? 'http://localhost:8000';
+                $appUrl = $_ENV['APP_URL'] ?? 'http://r-check.ru';
                 $emailBody = "
 <!DOCTYPE html>
 <html>
