@@ -22,6 +22,9 @@ function getActiveClass($page) {
                 <a href="/users_report.php" class="px-3 py-2 rounded-md text-sm font-medium <?= getActiveClass('users_report') ?>">
                     Отчет по пользователям
                 </a>
+                <a href="/products_report.php" class="px-3 py-2 rounded-md text-sm font-medium <?= getActiveClass('products_report') ?>">
+                    <i class="fas fa-box mr-1"></i>Отчет по товарам
+                </a>
                 <a href="/file_upload.php" class="px-3 py-2 rounded-md text-sm font-medium <?= getActiveClass('file_upload') ?>">
                     Загрузка файлов
                 </a>

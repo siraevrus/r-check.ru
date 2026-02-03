@@ -118,12 +118,15 @@ $dashboardData = $controller->getDashboardDataRaw();
         <div class="bg-white shadow rounded-lg mb-8">
             <div class="px-4 py-5 sm:p-6">
                 <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Управление системой</h3>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <a href="/promo_codes.php" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-center">
                         <i class="fas fa-ticket-alt mr-2"></i>Промокоды
                     </a>
                     <a href="/users_report.php" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-center">
                         <i class="fas fa-users mr-2"></i>Отчет по пользователям
+                    </a>
+                    <a href="/products_report.php" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 text-center">
+                        <i class="fas fa-box mr-2"></i>Отчет по товарам
                     </a>
                     <a href="/file_upload.php" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-center">
                         <i class="fas fa-upload mr-2"></i>Загрузка файлов
