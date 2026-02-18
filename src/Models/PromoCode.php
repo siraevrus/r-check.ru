@@ -35,9 +35,10 @@ class PromoCode
     }
 
     /**
-     * Находит промокод по последним трем цифрам (идентификатору).
+     * Находит промокод по последним трём цифрам.
+     * Если передан $hasHyphen, ищет только код того же типа (с тире или без).
      */
-    public static function findByLastThreeDigits(string $digits): ?self
+    public static function findByLastThreeDigits(string $digits, ?bool $hasHyphen = null): ?self
     {
         $digits = str_pad(preg_replace('/\D/', '', $digits), 3, '0', STR_PAD_LEFT);
         if (strlen($digits) !== 3) {
@@ -45,16 +46,22 @@ class PromoCode
         }
         $db = Database::getInstance();
         $driver = $db->getAttribute(\PDO::ATTR_DRIVER_NAME);
-        if ($driver === 'sqlite') {
-            $stmt = $db->prepare(
-                "SELECT * FROM promo_codes WHERE SUBSTR(REPLACE(REPLACE(code, '-', ''), ' ', ''), -3) = ? LIMIT 1"
-            );
-        } else {
-            $stmt = $db->prepare(
-                "SELECT * FROM promo_codes WHERE SUBSTRING(REPLACE(REPLACE(code, '-', ''), ' ', ''), -3) = ? LIMIT 1"
-            );
+        $sql = $driver === 'sqlite'
+            ? "SELECT * FROM promo_codes WHERE SUBSTR(REPLACE(REPLACE(code, '-', ''), ' ', ''), -3) = ?"
+            : "SELECT * FROM promo_codes WHERE SUBSTRING(REPLACE(REPLACE(code, '-', ''), ' ', ''), -3) = ?";
+        if ($hasHyphen !== null) {
+            $hyphenFlag = $hasHyphen ? 1 : 0;
+            $sql .= $driver === 'sqlite'
+                ? " AND (INSTR(code, '-') > 0) = ?"
+                : " AND (LOCATE('-', code) > 0) = ?";
         }
-        $stmt->execute([$digits]);
+        $sql .= " LIMIT 1";
+        $stmt = $db->prepare($sql);
+        $params = [$digits];
+        if ($hasHyphen !== null) {
+            $params[] = $hyphenFlag;
+        }
+        $stmt->execute($params);
         $data = $stmt->fetch();
         return $data ? new self($data) : null;
     }
@@ -167,9 +174,10 @@ class PromoCode
             if ($normalized === '') {
                 continue;
             }
-            $digits = PromoCodeNormalizer::extractLastThreeDigits($code);
+            $digits = PromoCodeNormalizer::extractLastThreeDigits($normalized);
             if ($digits !== null) {
-                $existing = self::findByLastThreeDigits($digits);
+                $hasHyphen = PromoCodeNormalizer::hasHyphenInNormalized($normalized);
+                $existing = self::findByLastThreeDigits($digits, $hasHyphen);
                 if ($existing !== null) {
                     continue;
                 }

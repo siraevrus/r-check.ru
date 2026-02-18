@@ -80,7 +80,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$promoCodeObj) {
             $digits = PromoCodeNormalizer::extractLastThreeDigits($promoCode);
             if ($digits !== null) {
-                $promoCodeObj = PromoCode::findByLastThreeDigits($digits);
+                $hasHyphen = PromoCodeNormalizer::hasHyphenInNormalized($promoCode);
+                $promoCodeObj = PromoCode::findByLastThreeDigits($digits, $hasHyphen);
             }
         }
         $promoCodeData = $promoCodeObj ? ['id' => $promoCodeObj->id, 'status' => $promoCodeObj->status] : null;

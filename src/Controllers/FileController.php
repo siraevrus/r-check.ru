@@ -156,12 +156,13 @@ class FileController
                         continue;
                     }
                     
-                    // Находим промокод в базе (по нормализованному коду или по последним трем цифрам)
+                    // Находим промокод в базе (по нормализованному коду или по последним трем цифрам того же типа)
                     $promoCodeObj = PromoCode::findByCode($promoCode);
                     if (!$promoCodeObj) {
                         $digits = PromoCodeNormalizer::extractLastThreeDigits($promoCode);
                         if ($digits !== null) {
-                            $promoCodeObj = PromoCode::findByLastThreeDigits($digits);
+                            $hasHyphen = PromoCodeNormalizer::hasHyphenInNormalized($promoCode);
+                            $promoCodeObj = PromoCode::findByLastThreeDigits($digits, $hasHyphen);
                         }
                     }
                     if (!$promoCodeObj) {
@@ -221,12 +222,13 @@ class FileController
                         continue;
                     }
                     
-                    // Находим промокод в базе (по нормализованному коду или по последним трем цифрам)
+                    // Находим промокод в базе (по нормализованному коду или по последним трем цифрам того же типа)
                     $promoCodeObj = PromoCode::findByCode($promoCode);
                     if (!$promoCodeObj) {
                         $digits = PromoCodeNormalizer::extractLastThreeDigits($promoCode);
                         if ($digits !== null) {
-                            $promoCodeObj = PromoCode::findByLastThreeDigits($digits);
+                            $hasHyphen = PromoCodeNormalizer::hasHyphenInNormalized($promoCode);
+                            $promoCodeObj = PromoCode::findByLastThreeDigits($digits, $hasHyphen);
                         }
                     }
                     if (!$promoCodeObj) {
