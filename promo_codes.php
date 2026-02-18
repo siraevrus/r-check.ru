@@ -13,6 +13,7 @@ require_once __DIR__ . '/includes/loading.php';
 
 use ReproCRM\Config\Config;
 use ReproCRM\Utils\Validator;
+use ReproCRM\Utils\PromoCodeNormalizer;
 
 Config::load();
 $_ENV['DB_TYPE'] = 'sqlite';
@@ -103,7 +104,7 @@ if ($_POST && isset($_POST['action'])) {
 
 // Обработка добавления промокода (одного или нескольких)
 if ($_POST && isset($_POST['action']) && $_POST['action'] === 'add_promo') {
-    $codesInput = strtoupper(trim($_POST['code']));
+    $codesInput = trim($_POST['code']);
     
     // Разделяем по запятой, пробелу или переносу строки
     $codes = preg_split('/[\s,;]+/', $codesInput, -1, PREG_SPLIT_NO_EMPTY);
@@ -120,22 +121,33 @@ if ($_POST && isset($_POST['action']) && $_POST['action'] === 'add_promo') {
             continue;
         }
         
-        // Валидация промокода
-        if ($validator->validatePromoCode($code)) {
-            // Проверяем уникальность
+        $normalized = PromoCodeNormalizer::normalize($code);
+        if ($normalized === '') {
+            $errorCount++;
+            continue;
+        }
+        
+        // Валидация промокода (нормализованного)
+        if ($validator->validatePromoCode($normalized)) {
+            // Проверяем дубликат по последним трем цифрам
+            $existingByDigits = PromoCodeNormalizer::findDuplicateByDigits($normalized, $pdo);
+            if ($existingByDigits !== null) {
+                $skippedCount++;
+                continue;
+            }
+            // Проверяем уникальность по точному совпадению
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM promo_codes WHERE code = ?");
-            $stmt->execute([$code]);
+            $stmt->execute([$normalized]);
             $exists = $stmt->fetchColumn();
             
             if ($exists > 0) {
                 $skippedCount++;
-                continue; // Промокод уже существует, пропускаем
+                continue;
             }
             
             try {
-                // Добавляем промокод
                 $stmt = $pdo->prepare("INSERT INTO promo_codes (code, status, created_at, updated_at) VALUES (?, 'unregistered', datetime('now'), datetime('now'))");
-                $stmt->execute([$code]);
+                $stmt->execute([$normalized]);
                 $addedCount++;
             } catch (Exception $e) {
                 $errorCount++;

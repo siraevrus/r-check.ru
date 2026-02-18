@@ -227,11 +227,15 @@ TEST0002,Продукт Б,2025-10-08,3
 
 #### Backup базы данных
 
+**Ручное создание (копия .db):**
 ```bash
-# Создание backup
 cp database/reprocrm.db backups/reprocrm_$(date +%Y%m%d_%H%M%S).db
+```
 
-# Восстановление
+**Автоматический бэкап в ZIP по cron** — см. [CRON_BACKUP.md](CRON_BACKUP.md). Скрипт `scripts/backup_db_zip.php` создаёт архив в `backups/`.
+
+**Восстановление из .db:**
+```bash
 cp backups/reprocrm_20251008_120000.db database/reprocrm.db
 ```
 

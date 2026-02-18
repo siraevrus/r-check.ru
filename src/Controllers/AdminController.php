@@ -8,6 +8,7 @@ use ReproCRM\Models\Doctor;
 use ReproCRM\Models\Sale;
 use ReproCRM\Middleware\AuthMiddleware;
 use ReproCRM\Utils\Response;
+use ReproCRM\Utils\PromoCodeNormalizer;
 
 class AdminController
 {
@@ -91,7 +92,11 @@ class AdminController
             return;
         }
         
-        $code = strtoupper(trim($data['code']));
+        $code = PromoCodeNormalizer::normalize(trim($data['code']));
+        if ($code === '') {
+            Response::error('Некорректный промокод', 400);
+            return;
+        }
         
         $length = strlen($code);
         if ($length < 5 || $length > 10) {
@@ -101,6 +106,13 @@ class AdminController
         
         if (!preg_match('/^[A-Z0-9!@#$%^&*()_+\-=\[\]{};:\'",.<>?\/\\|`~]+$/', $code)) {
             Response::error('Промокод должен содержать только заглавные буквы, цифры и символы', 400);
+            return;
+        }
+        
+        $pdo = \ReproCRM\Config\Database::getInstance();
+        $existingByDigits = PromoCodeNormalizer::findDuplicateByDigits($code, $pdo);
+        if ($existingByDigits !== null) {
+            Response::error('Промокод уже существует', 400);
             return;
         }
         

@@ -122,8 +122,7 @@ if ($_POST && isset($_POST['action']) && $_POST['action'] === 'cleanup_data') {
             $backupDir = __DIR__ . '/backups/';
             if (is_dir($backupDir)) {
                 $retentionDays = $settings['system']['backup_retention_days'];
-                $files = glob($backupDir . '*.db');
-                
+                $files = array_merge(glob($backupDir . '*.db') ?: [], glob($backupDir . '*.zip') ?: []);
                 foreach ($files as $file) {
                     if (filemtime($file) < time() - ($retentionDays * 24 * 60 * 60)) {
                         unlink($file);
@@ -169,7 +168,7 @@ try {
     
     // Количество резервных копий
     $backupDir = __DIR__ . '/backups/';
-    $systemStats['backups'] = is_dir($backupDir) ? count(glob($backupDir . '*.db')) : 0;
+    $systemStats['backups'] = is_dir($backupDir) ? count(glob($backupDir . '*.db') ?: []) + count(glob($backupDir . '*.zip') ?: []) : 0;
     
 } catch (Exception $e) {
     $systemStats = ['error' => $e->getMessage()];

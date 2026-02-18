@@ -3,6 +3,7 @@
 namespace ReproCRM\Models;
 
 use ReproCRM\Config\Database;
+use ReproCRM\Utils\PromoCodeNormalizer;
 
 class PromoCode
 {
@@ -30,6 +31,31 @@ class PromoCode
         $stmt->execute([$code]);
         $data = $stmt->fetch();
         
+        return $data ? new self($data) : null;
+    }
+
+    /**
+     * Находит промокод по последним трем цифрам (идентификатору).
+     */
+    public static function findByLastThreeDigits(string $digits): ?self
+    {
+        $digits = str_pad(preg_replace('/\D/', '', $digits), 3, '0', STR_PAD_LEFT);
+        if (strlen($digits) !== 3) {
+            return null;
+        }
+        $db = Database::getInstance();
+        $driver = $db->getAttribute(\PDO::ATTR_DRIVER_NAME);
+        if ($driver === 'sqlite') {
+            $stmt = $db->prepare(
+                "SELECT * FROM promo_codes WHERE SUBSTR(REPLACE(REPLACE(code, '-', ''), ' ', ''), -3) = ? LIMIT 1"
+            );
+        } else {
+            $stmt = $db->prepare(
+                "SELECT * FROM promo_codes WHERE SUBSTRING(REPLACE(REPLACE(code, '-', ''), ' ', ''), -3) = ? LIMIT 1"
+            );
+        }
+        $stmt->execute([$digits]);
+        $data = $stmt->fetch();
         return $data ? new self($data) : null;
     }
     
@@ -120,28 +146,44 @@ class PromoCode
     
     public function isValid(): bool
     {
-        return strlen($this->code) === 7 && ctype_alnum($this->code);
+        $len = strlen(preg_replace('/[\s\-]/', '', $this->code));
+        return $len >= 5 && $len <= 10;
     }
-    
+
+    /**
+     * Пакетное создание промокодов с нормализацией и проверкой дубликатов по последним трем цифрам.
+     */
     public static function batchCreate(array $codes): int
     {
         $db = Database::getInstance();
         $addedCount = 0;
-        
+
         foreach ($codes as $code) {
             $code = trim($code);
-            if (strlen($code) === 7 && ctype_alnum($code)) {
-                // Проверяем, не существует ли уже такой код
-                $existing = self::findByCode($code);
-                if (!$existing) {
-                    $promoCode = new self(['code' => $code]);
-                    if ($promoCode->save()) {
-                        $addedCount++;
-                    }
+            if ($code === '') {
+                continue;
+            }
+            $normalized = PromoCodeNormalizer::normalize($code);
+            if ($normalized === '') {
+                continue;
+            }
+            $digits = PromoCodeNormalizer::extractLastThreeDigits($code);
+            if ($digits !== null) {
+                $existing = self::findByLastThreeDigits($digits);
+                if ($existing !== null) {
+                    continue;
                 }
             }
+            $existingByCode = self::findByCode($normalized);
+            if ($existingByCode !== null) {
+                continue;
+            }
+            $promoCode = new self(['code' => $normalized]);
+            if ($promoCode->save()) {
+                $addedCount++;
+            }
         }
-        
+
         return $addedCount;
     }
 }

@@ -11,6 +11,7 @@ require_once __DIR__ . '/vendor/autoload.php';
 
 use ReproCRM\Config\Config;
 use ReproCRM\Utils\Validator;
+use ReproCRM\Utils\PromoCodeNormalizer;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 
@@ -132,10 +133,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $totalSales = $result['total_sales'] ?? 0;
                             $recordsCount = $result['processed'] ?? 0;
 
-                            // Сохраняем период в error_log для возможности предпросмотра
-                            $periodInfo = "период: $periodFrom - $periodTo";
-                            $statusMessage = "Загружено {$result['added']} новых записей, обновлено {$result['updated']} существующих. {$periodInfo}";
-                            
                             $stmt = $pdo->prepare("
                                 UPDATE upload_history
                                 SET rows_processed = ?, rows_success = ?, status = ?, error_log = ?
@@ -145,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $recordsCount,
                                 $result['added'] + $result['updated'],
                                 'completed',
-                                $statusMessage,
+                                "Загружено {$result['added']} новых записей, обновлено {$result['updated']} существующих",
                                 $result['upload_period_id']
                             ]);
 
@@ -401,7 +398,11 @@ function parseFile($filePath, $extension, $pdo, $periodFrom, $periodTo) {
         // Если ошибок нет, сохраняем данные в базу
         for ($row = 2; $row <= $highestRow; $row++) {
             try {
-                $promoCode = $columnMapping['promo_code'] ? trim($worksheet->getCell($columnMapping['promo_code'] . $row)->getFormattedValue()) : '';
+                $promoCodeRaw = $columnMapping['promo_code'] ? trim($worksheet->getCell($columnMapping['promo_code'] . $row)->getFormattedValue()) : '';
+                $promoCode = PromoCodeNormalizer::normalize($promoCodeRaw);
+                if ($promoCode === '') {
+                    $promoCode = $promoCodeRaw;
+                }
                 $cell = $columnMapping['product_name'] ? $worksheet->getCell($columnMapping['product_name'] . $row) : null;
                 $productNameRaw = $cell ? $cell->getValue() : '';
                 $formattedValue = $cell ? $cell->getFormattedValue() : '';
@@ -419,13 +420,21 @@ function parseFile($filePath, $extension, $pdo, $periodFrom, $periodTo) {
                     $saleDate = date('Y-m-d', strtotime($saleDate));
                 }
 
-                // Находим промокод или создаем его, если не существует
+                // Находим промокод по нормализованному коду или по последним трем цифрам, иначе создаем с нормализованным кодом
                 $stmt = $pdo->prepare("SELECT id FROM promo_codes WHERE code = ?");
                 $stmt->execute([$promoCode]);
                 $promoCodeId = $stmt->fetchColumn();
 
                 if (!$promoCodeId) {
-                    // Промокод не найден - создаем новый со статусом "unregistered"
+                    $existingCode = PromoCodeNormalizer::findDuplicateByDigits($promoCode, $pdo);
+                    if ($existingCode !== null) {
+                        $stmt = $pdo->prepare("SELECT id FROM promo_codes WHERE code = ?");
+                        $stmt->execute([$existingCode]);
+                        $promoCodeId = $stmt->fetchColumn();
+                        $promoCode = $existingCode;
+                    }
+                }
+                if (!$promoCodeId) {
                     $stmt = $pdo->prepare("INSERT INTO promo_codes (code, status, created_at, updated_at) VALUES (?, 'unregistered', datetime('now'), datetime('now'))");
                     $stmt->execute([$promoCode]);
                     $promoCodeId = $pdo->lastInsertId();
@@ -568,17 +577,6 @@ function parseFile($filePath, $extension, $pdo, $periodFrom, $periodTo) {
         @keyframes slideIn {
             from { transform: translateY(-50px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
-        }
-        .preview-table-container {
-            max-height: 500px;
-            overflow-y: auto;
-            overflow-x: auto;
-        }
-        .preview-table-container thead th {
-            position: sticky;
-            top: 0;
-            background-color: #f9fafb;
-            z-index: 10;
         }
     </style>
 </head>
@@ -1021,7 +1019,7 @@ NEWCODE1,Новый продукт,2025-10-08,10</pre>
                             </div>
                         </div>
                         <div class="px-6 py-4">
-                            <div class="preview-table-container">
+                            <div class="overflow-x-auto">
                                 <table class="min-w-full divide-y divide-gray-200">
                                     <thead class="bg-gray-50">
                                         <tr>

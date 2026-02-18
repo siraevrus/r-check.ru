@@ -3,6 +3,8 @@
 require_once __DIR__ . '/vendor/autoload.php';
 use ReproCRM\Config\Database;
 use ReproCRM\Utils\Validator;
+use ReproCRM\Utils\PromoCodeNormalizer;
+use ReproCRM\Models\PromoCode;
 
 $_ENV['DB_TYPE'] = 'sqlite';
 $db = Database::getInstance();
@@ -70,10 +72,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($promoCode)) {
         $errors[] = 'Промокод обязателен для заполнения';
     } else {
-        // Проверяем промокод
-        $stmt = $pdo->prepare("SELECT id, status FROM promo_codes WHERE code = ?");
-        $stmt->execute([$promoCode]);
-        $promoCodeData = $stmt->fetch();
+        $normalized = PromoCodeNormalizer::normalize($promoCode);
+        if ($normalized !== '') {
+            $promoCode = $normalized;
+        }
+        $promoCodeObj = PromoCode::findByCode($promoCode);
+        if (!$promoCodeObj) {
+            $digits = PromoCodeNormalizer::extractLastThreeDigits($promoCode);
+            if ($digits !== null) {
+                $promoCodeObj = PromoCode::findByLastThreeDigits($digits);
+            }
+        }
+        $promoCodeData = $promoCodeObj ? ['id' => $promoCodeObj->id, 'status' => $promoCodeObj->status] : null;
 
         if (!$promoCodeData) {
             $errors[] = 'Промокод не найден';

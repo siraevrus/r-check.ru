@@ -43,22 +43,17 @@ try {
     // Парсим период из error_log (формат: "Начало обработки файла - период: YYYY-MM-DD - YYYY-MM-DD")
     $periodFrom = null;
     $periodTo = null;
-    $errorLog = $upload['error_log'] ?? '';
-    
-    // Пробуем разные варианты формата периода
-    if (preg_match('/период:\s*(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})/i', $errorLog, $matches)) {
-        $periodFrom = $matches[1];
-        $periodTo = $matches[2];
-    } elseif (preg_match('/(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})/i', $errorLog, $matches)) {
-        // Альтернативный формат без слова "период"
+    if (preg_match('/период:\s*(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})/i', $upload['error_log'] ?? '', $matches)) {
         $periodFrom = $matches[1];
         $periodTo = $matches[2];
     }
     
-    // Логируем для отладки
-    error_log("Preview upload ID {$uploadId}: periodFrom={$periodFrom}, periodTo={$periodTo}, error_log=" . substr($errorLog, 0, 100));
+    // Получаем продажи, созданные в момент загрузки или сразу после
+    // Используем created_at продаж для связи с created_at загрузки
+    // Также фильтруем по периоду sale_date, если период указан
+    $uploadCreatedAt = $upload['created_at'];
+    $uploadCreatedAtEnd = date('Y-m-d H:i:s', strtotime($uploadCreatedAt . ' +5 minutes')); // +5 минут для учета времени обработки
     
-    // Формируем SQL запрос
     $sql = "
         SELECT 
             pc.code as promo_code,
@@ -69,31 +64,24 @@ try {
             ? as description
         FROM sales s
         JOIN promo_codes pc ON s.promo_code_id = pc.id
-        WHERE 1=1
+        WHERE s.created_at >= ? AND s.created_at <= ?
     ";
     
     $params = [
         $upload['created_at'],
-        $upload['error_log'] ?? ''
+        $upload['error_log'] ?? '',
+        $uploadCreatedAt,
+        $uploadCreatedAtEnd
     ];
     
-    // Если период указан, используем его как основной критерий поиска
-    // Это более надежно, чем поиск по времени создания
+    // Если период указан, дополнительно фильтруем по sale_date
     if ($periodFrom && $periodTo) {
         $sql .= " AND s.sale_date >= ? AND s.sale_date <= ?";
         $params[] = $periodFrom;
         $params[] = $periodTo;
-    } else {
-        // Если период не указан, используем увеличенное временное окно (30 минут)
-        // для учета времени обработки больших файлов, особенно XLSX
-        $uploadCreatedAt = $upload['created_at'];
-        $uploadCreatedAtEnd = date('Y-m-d H:i:s', strtotime($uploadCreatedAt . ' +30 minutes'));
-        $sql .= " AND s.created_at >= ? AND s.created_at <= ?";
-        $params[] = $uploadCreatedAt;
-        $params[] = $uploadCreatedAtEnd;
     }
     
-    $sql .= " ORDER BY s.sale_date DESC, s.created_at DESC";
+    $sql .= " ORDER BY s.created_at ASC";
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);

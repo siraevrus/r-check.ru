@@ -20,6 +20,23 @@ $pdo = $db;
 $message = '';
 $messageType = '';
 
+// Скачивание бэкапа (в т.ч. ZIP)
+if (!empty($_GET['action']) && $_GET['action'] === 'download' && !empty($_GET['file'])) {
+    $safeName = basename($_GET['file']);
+    if ($safeName !== $_GET['file'] || preg_match('/\\.(db|zip)$/i', $safeName) !== 1) {
+        header('HTTP/1.0 400 Bad Request');
+        exit;
+    }
+    $path = __DIR__ . '/backups/' . $safeName;
+    if (file_exists($path) && is_file($path)) {
+        header('Content-Type: ' . (pathinfo($safeName, PATHINFO_EXTENSION) === 'zip' ? 'application/zip' : 'application/octet-stream'));
+        header('Content-Disposition: attachment; filename="' . $safeName . '"');
+        header('Content-Length: ' . filesize($path));
+        readfile($path);
+        exit;
+    }
+}
+
 // Обработка создания резервной копии
 if ($_POST && isset($_POST['action']) && $_POST['action'] === 'create_backup') {
     try {
@@ -91,24 +108,25 @@ if ($_POST && isset($_POST['action']) && $_POST['action'] === 'delete_backup') {
     }
 }
 
-// Получаем список резервных копий
+// Получаем список резервных копий (.db и .zip)
 $backupDir = __DIR__ . '/backups/';
 $backups = [];
 if (is_dir($backupDir)) {
     $files = scandir($backupDir);
     foreach ($files as $file) {
-        if ($file !== '.' && $file !== '..' && pathinfo($file, PATHINFO_EXTENSION) === 'db') {
+        if ($file === '.' || $file === '..') continue;
+        $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+        if ($ext === 'db' || $ext === 'zip') {
             $filePath = $backupDir . $file;
             $backups[] = [
                 'name' => $file,
                 'size' => filesize($filePath),
                 'date' => filemtime($filePath),
-                'path' => $filePath
+                'path' => $filePath,
+                'is_zip' => ($ext === 'zip'),
             ];
         }
     }
-    
-    // Сортируем по дате (новые сверху)
     usort($backups, function($a, $b) {
         return $b['date'] - $a['date'];
     });
@@ -244,8 +262,9 @@ function formatBytes($size, $precision = 2) {
                                     <tr>
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="flex items-center">
-                                                <i class="fas fa-database text-blue-600 mr-3"></i>
+                                                <i class="fas <?= !empty($backup['is_zip']) ? 'fa-file-archive text-amber-600' : 'fa-database text-blue-600' ?> mr-3"></i>
                                                 <span class="text-sm font-medium text-gray-900"><?= htmlspecialchars($backup['name']) ?></span>
+                                                <?php if (!empty($backup['is_zip'])): ?><span class="ml-2 text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-800">ZIP</span><?php endif; ?>
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -255,6 +274,7 @@ function formatBytes($size, $precision = 2) {
                                             <?= date('d.m.Y H:i:s', $backup['date']) ?>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                                            <?php if (empty($backup['is_zip'])): ?>
                                             <form method="POST" class="inline" onsubmit="return confirm('Вы уверены, что хотите восстановить базу данных из этой резервной копии?')">
                                                 <input type="hidden" name="action" value="restore_backup">
                                                 <input type="hidden" name="backup_file" value="<?= htmlspecialchars($backup['name']) ?>">
@@ -262,7 +282,9 @@ function formatBytes($size, $precision = 2) {
                                                     <i class="fas fa-upload mr-1"></i>Восстановить
                                                 </button>
                                             </form>
-                                            
+                                            <?php else: ?>
+                                            <a href="?action=download&file=<?= urlencode($backup['name']) ?>" class="text-blue-600 hover:text-blue-900"><i class="fas fa-download mr-1"></i>Скачать</a>
+                                            <?php endif; ?>
                                             <form method="POST" class="inline" onsubmit="return confirm('Вы уверены, что хотите удалить эту резервную копию?')">
                                                 <input type="hidden" name="action" value="delete_backup">
                                                 <input type="hidden" name="backup_file" value="<?= htmlspecialchars($backup['name']) ?>">

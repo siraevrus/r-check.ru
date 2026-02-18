@@ -3,7 +3,7 @@
 namespace ReproCRM\Controllers;
 
 use ReproCRM\Models\Admin;
-use ReproCRM\Models\User;
+use ReproCRM\Models\Doctor;
 use ReproCRM\Utils\Response;
 use ReproCRM\Security\RateLimiter;
 use ReproCRM\Config\Database;
@@ -102,12 +102,11 @@ class PasswordResetController
         
         // Проверяем токен
         $db = Database::getInstance();
-        $now = date('Y-m-d H:i:s');
         $stmt = $db->prepare("
             SELECT * FROM password_resets 
-            WHERE token = ? AND expires_at > ? AND used_at IS NULL
+            WHERE token = ? AND expires_at > NOW() AND used_at IS NULL
         ");
-        $stmt->execute([$token, $now]);
+        $stmt->execute([$token]);
         $resetRecord = $stmt->fetch();
         
         if (!$resetRecord) {
@@ -144,9 +143,8 @@ class PasswordResetController
         }
         
         // Помечаем токен как использованный
-        $now = date('Y-m-d H:i:s');
-        $stmt = $db->prepare("UPDATE password_resets SET used_at = ? WHERE token = ?");
-        $stmt->execute([$now, $token]);
+        $stmt = $db->prepare("UPDATE password_resets SET used_at = NOW() WHERE token = ?");
+        $stmt->execute([$token]);
         
         Response::success(['message' => 'Пароль успешно изменен']);
     }

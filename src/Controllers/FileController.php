@@ -6,6 +6,7 @@ use ReproCRM\Models\PromoCode;
 use ReproCRM\Models\Sale;
 use ReproCRM\Middleware\AuthMiddleware;
 use ReproCRM\Utils\Response;
+use ReproCRM\Utils\PromoCodeNormalizer;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Reader\Csv;
 
@@ -22,19 +23,10 @@ class FileController
         
         $file = $_FILES['file'];
         $allowedTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/plain'];
-        $allowedExtensions = ['csv', 'xls', 'xlsx', 'txt'];
         
-        // Проверка расширения файла
-        $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        if (!in_array($fileExtension, $allowedExtensions)) {
+        if (!in_array($file['type'], $allowedTypes)) {
             Response::error('Неподдерживаемый тип файла. Разрешены: CSV, XLS, XLSX, TXT', 400);
             return;
-        }
-        
-        // Проверка MIME-типа (дополнительная проверка)
-        if (!in_array($file['type'], $allowedTypes) && $file['type'] !== 'application/octet-stream') {
-            // Если MIME-тип не совпадает, но расширение правильное, все равно разрешаем
-            // (некоторые браузеры могут отправлять неправильные MIME-типы)
         }
         
         $maxSize = 5 * 1024 * 1024; // 5MB
@@ -44,7 +36,7 @@ class FileController
         }
         
         try {
-            $codes = $this->parsePromoCodesFile($file['tmp_name'], $file['type'], $file['name']);
+            $codes = $this->parsePromoCodesFile($file['tmp_name'], $file['type']);
             $addedCount = PromoCode::batchCreate($codes);
             
             Response::success([
@@ -68,19 +60,10 @@ class FileController
         
         $file = $_FILES['file'];
         $allowedTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
-        $allowedExtensions = ['csv', 'xls', 'xlsx'];
         
-        // Проверка расширения файла
-        $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        if (!in_array($fileExtension, $allowedExtensions)) {
+        if (!in_array($file['type'], $allowedTypes)) {
             Response::error('Неподдерживаемый тип файла. Разрешены: CSV, XLS, XLSX', 400);
             return;
-        }
-        
-        // Проверка MIME-типа (дополнительная проверка)
-        if (!in_array($file['type'], $allowedTypes) && $file['type'] !== 'application/octet-stream') {
-            // Если MIME-тип не совпадает, но расширение правильное, все равно разрешаем
-            // (некоторые браузеры могут отправлять неправильные MIME-типы)
         }
         
         $maxSize = 10 * 1024 * 1024; // 10MB
@@ -90,7 +73,7 @@ class FileController
         }
         
         try {
-            $salesData = $this->parseSalesReportFile($file['tmp_name'], $file['type'], $file['name']);
+            $salesData = $this->parseSalesReportFile($file['tmp_name'], $file['type']);
             $addedCount = Sale::batchCreate($salesData);
             
             Response::success([
@@ -103,16 +86,11 @@ class FileController
         }
     }
     
-    private function parsePromoCodesFile(string $filePath, string $mimeType, string $fileName = ''): array
+    private function parsePromoCodesFile(string $filePath, string $mimeType): array
     {
         $codes = [];
         
-        // Определяем тип файла по расширению или MIME-типу
-        $fileExtension = $fileName ? strtolower(pathinfo($fileName, PATHINFO_EXTENSION)) : '';
-        $isCsv = in_array($fileExtension, ['csv', 'txt']) || strpos($mimeType, 'csv') !== false || strpos($mimeType, 'text') !== false;
-        
-        if ($isCsv) {
-            // Обработка CSV/TXT файлов
+        if (strpos($mimeType, 'csv') !== false || strpos($mimeType, 'text') !== false) {
             $handle = fopen($filePath, 'r');
             if ($handle === false) {
                 throw new \Exception('Не удалось открыть файл');
@@ -126,7 +104,6 @@ class FileController
             
             fclose($handle);
         } else {
-            // Обработка Excel файлов
             $reader = IOFactory::createReader(IOFactory::identify($filePath));
             $spreadsheet = $reader->load($filePath);
             $worksheet = $spreadsheet->getActiveSheet();
@@ -139,20 +116,21 @@ class FileController
             }
         }
         
-        return array_filter($codes, function($code) {
-            return strlen($code) === 7 && ctype_alnum($code);
-        });
+        $normalized = [];
+        foreach ($codes as $code) {
+            $n = PromoCodeNormalizer::normalize($code);
+            if ($n !== '' && strlen($n) >= 5 && strlen($n) <= 10) {
+                $normalized[] = $n;
+            }
+        }
+        return array_values(array_unique($normalized));
     }
     
-    private function parseSalesReportFile(string $filePath, string $mimeType, string $fileName = ''): array
+    private function parseSalesReportFile(string $filePath, string $mimeType): array
     {
         $salesData = [];
         
-        // Определяем тип файла по расширению или MIME-типу
-        $fileExtension = $fileName ? strtolower(pathinfo($fileName, PATHINFO_EXTENSION)) : '';
-        $isCsv = $fileExtension === 'csv' || strpos($mimeType, 'csv') !== false;
-        
-        if ($isCsv) {
+        if (strpos($mimeType, 'csv') !== false) {
             // Обработка CSV файлов
             $handle = fopen($filePath, 'r');
             if ($handle === false) {
@@ -164,7 +142,11 @@ class FileController
             
             while (($line = fgetcsv($handle)) !== false) {
                 if (count($line) >= 3) {
-                    $promoCode = trim($line[0]);
+                    $promoCodeRaw = trim($line[0]);
+                    $promoCode = PromoCodeNormalizer::normalize($promoCodeRaw);
+                    if ($promoCode === '') {
+                        $promoCode = $promoCodeRaw;
+                    }
                     $productName = trim($line[1]);
                     $saleDate = trim($line[2]);
                     $quantity = isset($line[3]) ? (int) $line[3] : 1;
@@ -174,8 +156,14 @@ class FileController
                         continue;
                     }
                     
-                    // Находим промокод в базе
+                    // Находим промокод в базе (по нормализованному коду или по последним трем цифрам)
                     $promoCodeObj = PromoCode::findByCode($promoCode);
+                    if (!$promoCodeObj) {
+                        $digits = PromoCodeNormalizer::extractLastThreeDigits($promoCode);
+                        if ($digits !== null) {
+                            $promoCodeObj = PromoCode::findByLastThreeDigits($digits);
+                        }
+                    }
                     if (!$promoCodeObj) {
                         continue; // Пропускаем неизвестные промокоды
                     }
@@ -219,7 +207,11 @@ class FileController
             
             foreach ($rows as $row) {
                 if (count($row) >= 3) {
-                    $promoCode = trim($row[0]);
+                    $promoCodeRaw = trim($row[0]);
+                    $promoCode = PromoCodeNormalizer::normalize($promoCodeRaw);
+                    if ($promoCode === '') {
+                        $promoCode = $promoCodeRaw;
+                    }
                     $productName = trim($row[1]);
                     $saleDate = trim($row[2]);
                     $quantity = isset($row[3]) ? (int) $row[3] : 1;
@@ -229,8 +221,14 @@ class FileController
                         continue;
                     }
                     
-                    // Находим промокод в базе
+                    // Находим промокод в базе (по нормализованному коду или по последним трем цифрам)
                     $promoCodeObj = PromoCode::findByCode($promoCode);
+                    if (!$promoCodeObj) {
+                        $digits = PromoCodeNormalizer::extractLastThreeDigits($promoCode);
+                        if ($digits !== null) {
+                            $promoCodeObj = PromoCode::findByLastThreeDigits($digits);
+                        }
+                    }
                     if (!$promoCodeObj) {
                         continue; // Пропускаем неизвестные промокоды
                     }
