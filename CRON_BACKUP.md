@@ -2,6 +2,22 @@
 
 Скрипт `scripts/backup_db_zip.php` создаёт резервную копию базы данных в ZIP и кладёт её в папку `backups/`.
 
+## Запуск вручную
+
+Скрипт лежит **внутри каталога проекта**. Запускать нужно через `php`, указав полный путь к проекту:
+
+```bash
+# Замените /var/www/promocod на путь к вашему проекту
+php /var/www/promocod/scripts/backup_db_zip.php
+```
+
+Или из корня проекта:
+
+```bash
+cd /var/www/promocod
+php scripts/backup_db_zip.php
+```
+
 - **SQLite**: копирует `database/reprocrm.db` в архив `reprocrm_backup_YYYY-MM-DD_HH-mm-ss.zip`.
 - **MySQL**: делает дамп через `mysqldump` и упаковывает его в такой же ZIP.
 
